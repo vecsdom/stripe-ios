@@ -109,7 +109,8 @@ final class PayWithLinkViewController: UINavigationController {
         context: Context
     ) {
         // TODO(porter): Hack, don't use payment sheet appearance in Link
-        ElementsUITheme.current = ElementsUITheme.default
+        ElementsUITheme.current = .linkTheme()
+
         self.linkAccount = linkAccount
         self.context = context
         super.init(nibName: nil, bundle: nil)
@@ -126,6 +127,7 @@ final class PayWithLinkViewController: UINavigationController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.accessibilityIdentifier = "Stripe.Link.PayWithLinkViewController"
         navigationBar.applyLinkTheme()
         view.tintColor = .linkBrand
         updateUI()

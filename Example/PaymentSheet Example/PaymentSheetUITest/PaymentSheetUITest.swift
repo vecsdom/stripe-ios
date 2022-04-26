@@ -304,11 +304,61 @@ class PaymentSheetUITest: XCTestCase {
         payButton.tap()
             
     }
+
+    func testUSBankAccountPaymentMethod() throws {
+        loadPlayground(app, settings: [
+            "customer_mode": "new",
+            "automatic_payment_methods": "off",
+            "allows_delayed_pms": "true"
+        ])
+        app.buttons["Checkout (Complete)"].tap()
+
+        // Select US Bank Account
+        guard let usBankAccount = scroll(collectionView: app.collectionViews.firstMatch, toFindCellWithId: "US Bank Account") else {
+            XCTFail()
+            return
+        }
+        usBankAccount.tap()
+
+        let continueButton = app.buttons["Continue"]
+        XCTAssertFalse(continueButton.isEnabled)
+
+        let name = app.textFields["Name"]
+        name.tap()
+        name.typeText("John Doe")
+        name.typeText(XCUIKeyboardKey.return.rawValue)
+
+        let email = app.textFields["Email"]
+        email.tap()
+        email.typeText("test@example.com")
+        email.typeText(XCUIKeyboardKey.return.rawValue)
+
+        XCTAssertTrue(continueButton.isEnabled)
+        continueButton.tap()
+
+        let payButton = app.buttons["Pay $50.99"]
+        XCTAssertTrue(payButton.waitForExistence(timeout: 5))
+
+        let expectDefaultSelectionOn = Locale.current.regionCode == "US"
+        let selectedMandate = "By saving your bank account for Example, Inc. you agree to authorize payments pursuant to these terms."
+        let unselectedMandate = "By continuing, you agree to authorize payments pursuant to these terms."
+        XCTAssertTrue(app.textViews[expectDefaultSelectionOn ? selectedMandate : unselectedMandate].waitForExistence(timeout: 5))
+
+
+
+        let saveThisAccountToggle = app.switches["Save this account for future Example, Inc. payments"]
+        saveThisAccountToggle.tap()
+        XCTAssertTrue(app.textViews[expectDefaultSelectionOn ? unselectedMandate : selectedMandate].waitForExistence(timeout: 5))
+
+        // no pay button tap because linked account is stubbed/fake in UI test
+    }
 }
 
 // MARK: - Link
 
 extension PaymentSheetUITest {
+
+    // MARK: Inline signup
 
     /// Tests the Link inline signup flow.
     func testLinkInlineSignup() throws {
@@ -335,9 +385,7 @@ extension PaymentSheetUITest {
 
         // XCUIApplication cannot synthesize typing events to the phone field.
         // So we need to punch-in each digit via the keyboard.
-        "3105551234".forEach { digit in
-            app.keys[String(digit)].tap()
-        }
+        app.typeTextWithKeyboard("3105551234")
 
         // Pay!
         app.buttons["Pay $50.99"].tap()
@@ -376,10 +424,111 @@ extension PaymentSheetUITest {
         let codeField = app.descendants(matching: .any)["Code field"]
         XCTAssert(codeField.waitForExistence(timeout: 10))
         codeField.tap()
+        app.typeTextWithKeyboard("000000")
 
-        "000000".forEach { digit in
-            app.keys[String(digit)].tap()
+        let successText = app.alerts.staticTexts["Success!"]
+        XCTAssertTrue(successText.waitForExistence(timeout: 10))
+
+        let okButton = app.alerts.buttons["OK"]
+        okButton.tap()
+    }
+
+    // MARK: Modal
+
+    func testLinkSignup() throws {
+        loadPlayground(app, settings: [
+            "customer_mode": "new",
+            "automatic_payment_methods": "off",
+            "link": "on"
+        ])
+
+        app.buttons["Checkout (Complete)"].tap()
+
+        let payWithLinkButton = app.buttons["Pay with Link"]
+        XCTAssertTrue(payWithLinkButton.waitForExistence(timeout: 10))
+        payWithLinkButton.tap()
+
+        let modal = app.otherElements["Stripe.Link.PayWithLinkViewController"]
+        XCTAssertTrue(modal.waitForExistence(timeout: 10))
+
+        let emailField = modal.textFields["Email"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 10))
+        emailField.tap()
+        emailField.typeText("mobile-payments-sdk-ci+\(UUID())@stripe.com")
+
+        let phoneField = modal.otherElements["Mobile number"]
+        XCTAssert(phoneField.waitForExistence(timeout: 10))
+        phoneField.tap()
+        app.typeTextWithKeyboard("3105551234")
+
+        // Terms and privacy policy
+        for linkText in ["Terms", "Privacy Policy"] {
+            modal.links[linkText].tap()
+            let closeTermsButton = app.otherElements["TopBrowserBar"].buttons["Close"]
+            XCTAssert(closeTermsButton.waitForExistence(timeout: 10))
+            closeTermsButton.tap()
         }
+
+        modal.buttons["Join Link"].tap()
+
+        // Because we are presenting view controllers with `modalPresentationStyle = .overFullScreen`,
+        // there are currently 2 card forms on screen. Specifying a container helps the `fillCardData()`
+        // method operate on the correct card form.
+        try fillCardData(app, container: modal)
+
+        // Pay!
+        let payButton = modal.buttons["Pay $50.99"]
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: payButton, handler: nil)
+        waitForExpectations(timeout: 10, handler: nil)
+        payButton.tap()
+
+        let successText = app.alerts.staticTexts["Success!"]
+        XCTAssertTrue(successText.waitForExistence(timeout: 10))
+
+        let okButton = app.alerts.buttons["OK"]
+        okButton.tap()
+    }
+
+    func testLinkSignIn() throws {
+        loadPlayground(app, settings: [
+            "customer_mode": "new",
+            "automatic_payment_methods": "off",
+            "link": "on"
+        ])
+
+        app.buttons["Checkout (Complete)"].tap()
+
+        let payWithLinkButton = app.buttons["Pay with Link"]
+        XCTAssertTrue(payWithLinkButton.waitForExistence(timeout: 10))
+        payWithLinkButton.tap()
+
+        let modal = app.otherElements["Stripe.Link.PayWithLinkViewController"]
+        XCTAssertTrue(modal.waitForExistence(timeout: 10))
+
+        let emailField = modal.textFields["Email"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 10))
+        emailField.tap()
+        emailField.typeText("mobile-payments-sdk-ci+a-consumer@stripe.com")
+
+        // Wait for OTP screen and enter the code
+        let codeField = app.descendants(matching: .any)["Code field"]
+        XCTAssert(codeField.waitForExistence(timeout: 10))
+        codeField.tap()
+        app.typeTextWithKeyboard("000000")
+
+        let paymentMethodPicker = app.otherElements["Stripe.Link.PaymentMethodPicker"]
+        if paymentMethodPicker.waitForExistence(timeout: 10) {
+            paymentMethodPicker.tap()
+            paymentMethodPicker.buttons["Add new payment method"].tap()
+        }
+
+        try fillCardData(app, container: modal)
+
+        // Pay!
+        let payButton = modal.buttons["Pay $50.99"]
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: payButton, handler: nil)
+        waitForExpectations(timeout: 10, handler: nil)
+        payButton.tap()
 
         let successText = app.alerts.staticTexts["Success!"]
         XCTAssertTrue(successText.waitForExistence(timeout: 10))

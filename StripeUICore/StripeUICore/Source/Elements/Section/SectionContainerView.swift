@@ -107,7 +107,7 @@ class SectionContainerView: UIView {
     // MARK: - Internal methods
 
     func updateUI(newViews: [UIView]? = nil) {
-        layer.applyShadow(theme: ElementsUITheme.current)
+        layer.applyShadow(shadow: ElementsUITheme.current.shadow)
         layer.cornerRadius = ElementsUITheme.current.cornerRadius
         
         if isUserInteractionEnabled || isDarkMode() {
@@ -205,5 +205,6 @@ private func buildStackView(views: [UIView]) -> StackViewWithSeparator {
     stackView.borderCornerRadius = ElementsUITheme.current.cornerRadius
     stackView.customBackgroundColor = ElementsUITheme.current.colors.background
     stackView.drawBorder = true
+    stackView.hideShadow = true // Shadow is handled by `SectionContainerView`
     return stackView
 }

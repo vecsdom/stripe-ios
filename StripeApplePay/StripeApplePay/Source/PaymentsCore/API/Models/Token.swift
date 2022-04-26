@@ -11,7 +11,7 @@ import PassKit
 @_spi(STP) import StripeCore
 
 extension StripeAPI {
-    struct Token: StripeDecodable {
+    struct Token: UnknownFieldsDecodable {
         var _allResponseFieldsStorage: NonEncodableParameters?
         
         /// The value of the token. You can store this value on your server and use it to make charges and customers.
@@ -38,7 +38,6 @@ extension StripeAPI {
         
         /// The credit card details that were used to create the token. Will only be set if the token was created via a credit card or Apple Pay, otherwise it will be
         /// nil.
-        @IncludeUnknownFields
         var card: Card?
         // /// The bank account details that were used to create the token. Will only be set if the token was created with a bank account, otherwise it will be nil.
         // Not yet implemented.
@@ -46,7 +45,7 @@ extension StripeAPI {
         /// When the token was created.
         var created: Date?
         
-        struct Card: StripeDecodable {
+        struct Card: UnknownFieldsDecodable {
             var _allResponseFieldsStorage: NonEncodableParameters?
 
             /// The last 4 digits of the card.
@@ -99,27 +98,7 @@ extension StripeAPI {
             var addressZipCheck: AddressCheck?
             
             /// The issuer of the card.
-            var brand: Brand = .unknown
-            
-            /// The various card brands to which a payment card can belong.
-            enum Brand: String, Decodable {
-                /// Visa card
-                case visa = "Visa"
-                /// American Express card
-                case amex = "American Express"
-                /// Mastercard card
-                case mastercard = "MasterCard"
-                /// Discover card
-                case discover = "Discover"
-                /// JCB card
-                case JCB = "JCB"
-                /// Diners Club card
-                case dinersClub = "Diners Club"
-                /// UnionPay card
-                case unionPay = "UnionPay"
-                /// An unknown card brand type
-                case unknown = "Unknown"
-            }
+            var brand: CardBrand = .unknown
             
             /// The funding source for the card (credit, debit, prepaid, or other)
             var funding: FundingType = .other

@@ -11,7 +11,7 @@ import CoreGraphics
 
 
 
-struct VerificationPageStaticContentDocumentCapturePage: StripeDecodable, Equatable {
+struct VerificationPageStaticContentDocumentCapturePage: Decodable, Equatable {
     let autocaptureTimeout: Int
     let filePurpose: String
     let highResImageCompressionQuality: CGFloat
@@ -23,8 +23,6 @@ struct VerificationPageStaticContentDocumentCapturePage: StripeDecodable, Equata
     let lowResImageMaxDimension: Int
     let models: VerificationPageStaticContentDocumentCaptureModels
     let motionBlurMinDuration: Int
-    let motionBlurMinIou: CGFloat
+    let motionBlurMinIou: Decimal
     let requireLiveCapture: Bool
-
-    var _allResponseFieldsStorage: NonEncodableParameters?
 }

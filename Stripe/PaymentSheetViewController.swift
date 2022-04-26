@@ -135,6 +135,9 @@ class PaymentSheetViewController: UIViewController {
     private lazy var errorLabel: UILabel = {
         return ElementsUI.makeErrorLabel()
     }()
+    private lazy var bottomNoticeTextField: UITextView = {
+        return ElementsUI.makeNoticeTextField()
+    }()
     private lazy var buyButton: ConfirmButton = {
         let callToAction: ConfirmButton.CallToActionType = {
             switch intent {
@@ -149,7 +152,6 @@ class PaymentSheetViewController: UIViewController {
             style: .stripe,
             callToAction: callToAction,
             appearance: configuration.appearance,
-            backgroundColor: configuration.primaryButtonColor,
             didTap: { [weak self] in
                 self?.didTapBuyButton()
             }
@@ -186,9 +188,6 @@ class PaymentSheetViewController: UIViewController {
 
         super.init(nibName: nil, bundle: nil)
         self.view.backgroundColor = configuration.appearance.colors.background
-
-        // Set the current elements theme
-        ElementsUITheme.current = configuration.appearance.asElementsTheme
     }
 
     // MARK: UIViewController Methods
@@ -198,7 +197,7 @@ class PaymentSheetViewController: UIViewController {
 
         // One stack view contains all our subviews
         let stackView = UIStackView(arrangedSubviews: [
-            headerLabel, walletHeader, paymentContainerView, errorLabel, buyButton,
+            headerLabel, walletHeader, paymentContainerView, errorLabel, buyButton, bottomNoticeTextField
         ])
         stackView.directionalLayoutMargins = PaymentSheetUI.defaultMargins
         stackView.isLayoutMarginsRelativeArrangement = true
@@ -206,6 +205,7 @@ class PaymentSheetViewController: UIViewController {
         stackView.axis = .vertical
         stackView.bringSubviewToFront(headerLabel)
         stackView.setCustomSpacing(32, after: paymentContainerView)
+        stackView.setCustomSpacing(0, after: buyButton)
 
         // Hack: Payment container needs to extend to the edges, so we'll 'cancel out' the layout margins with negative padding
         paymentContainerView.directionalLayoutMargins = .insets(
@@ -352,10 +352,16 @@ class PaymentSheetViewController: UIViewController {
             buyButtonStyle = .stripe
             if let overrideCallToAction = addPaymentMethodViewController.overrideCallToAction {
                 callToAction = overrideCallToAction
+                buyButtonStatus = addPaymentMethodViewController.overrideCallToActionShouldEnable ? .enabled : .disabled
+            } else {
+                buyButtonStatus =
+                    addPaymentMethodViewController.paymentOption == nil ? .disabled : .enabled
             }
-            buyButtonStatus =
-                addPaymentMethodViewController.paymentOption == nil ? .disabled : .enabled
         }
+
+        // Notice
+        updateBottomNotice()
+
         if isPaymentInFlight {
             buyButtonStatus = .processing
         }
@@ -378,17 +384,29 @@ class PaymentSheetViewController: UIViewController {
         }
     }
 
+    func updateBottomNotice() {
+        switch mode {
+        case .selectingSaved:
+            self.bottomNoticeTextField.attributedText = savedPaymentOptionsViewController.bottomNoticeAttributedString
+        case .addingNew:
+            self.bottomNoticeTextField.attributedText = addPaymentMethodViewController.bottomNoticeAttributedString
+        }
+        UIView.animate(withDuration: PaymentSheetUI.defaultAnimationDuration) {
+            self.bottomNoticeTextField.setHiddenIfNecessary(self.bottomNoticeTextField.attributedText?.length == 0)
+        }
+    }
+
     @objc
     private func didTapBuyButton() {
         switch mode {
         case .addingNew:
-            guard let newPaymentOption = addPaymentMethodViewController.paymentOption else {
-                assertionFailure()
-                return
-            }
             if let buyButtonOverrideBehavior = addPaymentMethodViewController.overrideBuyButtonBehavior {
-                addPaymentMethodViewController.didTapBuyButton(behavior: buyButtonOverrideBehavior, from: self)
+                addPaymentMethodViewController.didTapCallToActionButton(behavior: buyButtonOverrideBehavior, from: self)
             } else {
+                guard let newPaymentOption = addPaymentMethodViewController.paymentOption else {
+                    assertionFailure()
+                    return
+                }
                 pay(with: newPaymentOption)
             }
         case .selectingSaved:
@@ -528,6 +546,7 @@ extension PaymentSheetViewController: SavedPaymentOptionsViewControllerDelegate 
             // just update the nav bar which is all we need to do anyway
             configureNavBar()
         }
+        updateBottomNotice()
     }
 
     // MARK: Helpers

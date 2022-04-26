@@ -101,7 +101,7 @@ extension PaymentSheet {
             switch intent {
             // MARK: PaymentIntent
             case .paymentIntent(let paymentIntent):
-                let paymentIntentParams = STPPaymentIntentParams(clientSecret: paymentIntent.clientSecret)
+                let paymentIntentParams = STPPaymentIntentParams(clientSecret: paymentIntent.clientSecret, paymentMethodType: paymentMethod.type)
                 paymentIntentParams.returnURL = configuration.returnURL
                 paymentIntentParams.paymentMethodId = paymentMethod.stripeId
                 // Overwrite in case payment_method_options was set previously - we don't want to save an already-saved payment method
@@ -115,7 +115,7 @@ extension PaymentSheet {
             // MARK: SetupIntent
             case .setupIntent(let setupIntent):
                 let setupIntentParams = STPSetupIntentConfirmParams(
-                    clientSecret: setupIntent.clientSecret)
+                    clientSecret: setupIntent.clientSecret, paymentMethodType: paymentMethod.type)
                 setupIntentParams.returnURL = configuration.returnURL
                 setupIntentParams.paymentMethodID = paymentMethod.stripeId
                 paymentHandler.confirmSetupIntent(
@@ -309,7 +309,7 @@ extension PaymentSheet {
         }
 
         // List the Customer's saved PaymentMethods
-        let savedPaymentMethodTypes: [STPPaymentMethodType] = [.card] // hardcoded for now
+        let savedPaymentMethodTypes: [STPPaymentMethodType] = [.card, .USBankAccount] // hardcoded for now
         if let customerID = configuration.customer?.id, let ephemeralKey = configuration.customer?.ephemeralKeySecret {
             configuration.apiClient.listPaymentMethods(
                 forCustomer: customerID,

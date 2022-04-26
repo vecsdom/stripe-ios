@@ -8,6 +8,9 @@
 //  This file contains types that abstract over PaymentIntent and SetupIntent for convenience.
 
 import Foundation
+import UIKit
+
+@_spi(STP) import StripeCore
 
 // MARK: - Intent
 
@@ -82,6 +85,26 @@ class IntentConfirmParams {
     var shouldSavePaymentMethod: Bool = false
     /// - Note: PaymentIntent-only
     var paymentMethodOptions: STPConfirmPaymentMethodOptions?
+
+    var linkedBank: LinkedBank? = nil
+
+    var paymentSheetLabel: String {
+        if let linkedBank = linkedBank,
+           let last4 = linkedBank.last4 {
+            return "••••\(last4)"
+        } else {
+            return paymentMethodParams.paymentSheetLabel
+        }
+    }
+
+    func makeIcon() -> UIImage {
+        if let linkedBank = linkedBank,
+           let bankName = linkedBank.bankName {
+            return STPImageLibrary.bankIcon(for: STPImageLibrary.bankIconCode(for: bankName))
+        } else {
+            return paymentMethodParams.makeIcon()
+        }
+    }
     
     convenience init(type: STPPaymentMethodType) {
         self.init(params: STPPaymentMethodParams(type: type))
@@ -132,12 +155,12 @@ extension STPConfirmPaymentMethodOptions {
         We write payment method options SFU to set the customer’s desired save behavior
      */
     func setSetupFutureUsageIfNecessary(_ shouldSave: Bool, paymentMethodType: STPPaymentMethodType) {
-        guard paymentMethodType == .card else {
-            // Only support card setup_future_usage in payment_method_options
+        guard paymentMethodType == .card || paymentMethodType == .USBankAccount else {
+            // Only support card and US bank setup_future_usage in payment_method_options
             return
         }
         
-        additionalAPIParameters["card"] = [
+        additionalAPIParameters[STPPaymentMethod.string(from: paymentMethodType)] = [
             // We pass an empty string to 'unset' this value. This makes the PaymentIntent inherit the top-level setup_future_usage.
             "setup_future_usage": shouldSave ? "off_session" : ""
         ]

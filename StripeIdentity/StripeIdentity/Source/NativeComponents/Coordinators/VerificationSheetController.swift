@@ -115,7 +115,7 @@ final class VerificationSheetController: VerificationSheetControllerProtocol {
 
     func startLoadingMLModels(from verificationPage: VerificationPage) {
         mlModelLoader.startLoadingDocumentModels(
-            from: verificationPage.documentCapture.models
+            from: verificationPage.documentCapture
         )
     }
 
@@ -132,8 +132,7 @@ final class VerificationSheetController: VerificationSheetControllerProtocol {
         apiClient.updateIdentityVerificationPageData(
             updating: .init(
                 clearData: .init(clearFields: flowController.uncollectedFields),
-                collectedData: collectedData,
-                _additionalParametersStorage: nil
+                collectedData: collectedData
             )
         ).observe(on: .main) { [weak self] result in
             self?.saveCheckSubmitAndTransition(
@@ -162,8 +161,7 @@ final class VerificationSheetController: VerificationSheetControllerProtocol {
             return apiClient.updateIdentityVerificationPageData(
                 updating: VerificationPageDataUpdate(
                     clearData: .init(clearFields: flowController?.uncollectedFields ?? []),
-                    collectedData: collectedData,
-                    _additionalParametersStorage: nil
+                    collectedData: collectedData
                 )
             )
         }.observe(on: .main) { [weak self] result in

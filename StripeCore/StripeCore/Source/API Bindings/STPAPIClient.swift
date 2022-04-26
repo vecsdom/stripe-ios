@@ -218,7 +218,7 @@ private let APIBaseURL = "https://api.stripe.com/v1"
 // MARK: Modern bindings
 extension STPAPIClient {
     /// Make a GET request using the passed parameters.
-    @_spi(STP) public func get<T: StripeDecodable>(
+    @_spi(STP) public func get<T: Decodable>(
         resource: String,
         parameters: [String: Any],
         ephemeralKeySecret: String? = nil,
@@ -232,12 +232,28 @@ extension STPAPIClient {
             completion: completion
         )
     }
+    
+    /// Make a GET request using the passed parameters.
+    @_spi(STP) public func get<T: Decodable>(
+        url: URL,
+        parameters: [String: Any],
+        ephemeralKeySecret: String? = nil,
+        completion: @escaping (Result<T, Error>
+        ) -> Void) {
+        request(
+            method: .get,
+            parameters: parameters,
+            ephemeralKeySecret: ephemeralKeySecret,
+            url: url,
+            completion: completion
+        )
+    }
 
     /**
      Make a GET request using the passed parameters.
      - Returns: a promise that is fullfilled when the request is complete.
      */
-    @_spi(STP) public func get<T: StripeDecodable>(
+    @_spi(STP) public func get<T: Decodable>(
         resource: String,
         parameters: [String: Any],
         ephemeralKeySecret: String? = nil
@@ -251,7 +267,7 @@ extension STPAPIClient {
     }
     
     /// Make a POST request using the passed parameters.
-    @_spi(STP) public func post<T: StripeDecodable>(
+    @_spi(STP) public func post<T: Decodable>(
         resource: String,
         parameters: [String: Any],
         ephemeralKeySecret: String? = nil,
@@ -265,12 +281,28 @@ extension STPAPIClient {
             completion: completion
         )
     }
+    
+    /// Make a POST request using the passed parameters.
+    @_spi(STP) public func post<T: Decodable>(
+        url: URL,
+        parameters: [String: Any],
+        ephemeralKeySecret: String? = nil,
+        completion: @escaping (Result<T, Error>) -> Void
+    ) {
+        request(
+            method: .post,
+            parameters: parameters,
+            ephemeralKeySecret: ephemeralKeySecret,
+            url: url,
+            completion: completion
+        )
+    }
 
     /**
      Make a POST request using the passed parameters.
      - Returns: a promise that is fullfilled when the request is complete.
      */
-    @_spi(STP) public func post<T: StripeDecodable>(
+    @_spi(STP) public func post<T: Decodable>(
         resource: String,
         parameters: [String: Any],
         ephemeralKeySecret: String? = nil
@@ -278,7 +310,7 @@ extension STPAPIClient {
         return request(method: .post, parameters: parameters, ephemeralKeySecret: ephemeralKeySecret, resource: resource)
     }
 
-    func request<T: StripeDecodable>(
+    func request<T: Decodable>(
         method: HTTPMethod,
         parameters: [String: Any],
         ephemeralKeySecret: String?,
@@ -296,15 +328,26 @@ extension STPAPIClient {
         return promise
     }
 
-    func request<T: StripeDecodable>(
+    func request<T: Decodable>(
         method: HTTPMethod,
         parameters: [String: Any],
         ephemeralKeySecret: String?,
         resource: String,
         completion: @escaping (Result<T, Error>) -> Void
     ) {
-        var urlComponents = URLComponents(url: apiURL.appendingPathComponent(resource), resolvingAgainstBaseURL: true)!
-        var request = configuredRequest(for: urlComponents.url!)
+        let url = apiURL.appendingPathComponent(resource)
+        request(method: method, parameters: parameters, ephemeralKeySecret: ephemeralKeySecret, url: url, completion: completion)
+    }
+    
+    func request<T: Decodable>(
+        method: HTTPMethod,
+        parameters: [String: Any],
+        ephemeralKeySecret: String?,
+        url: URL,
+        completion: @escaping (Result<T, Error>) -> Void
+    ) {
+        var request = configuredRequest(for: url)
+        var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: true)!
         switch method {
         case .get:
             let query = URLEncoder.queryString(from: parameters)
@@ -325,10 +368,10 @@ extension STPAPIClient {
     }
 
     /**
-     Make a POST request using the passed StripeEncodable object.
+     Make a POST request using the passed Encodable object.
      - Returns: a promise that is fullfilled when the request is complete.
      */
-    @_spi(STP) public func post<I: StripeEncodable, O: StripeDecodable>(
+    @_spi(STP) public func post<I: Encodable, O: Decodable>(
         resource: String,
         object: I,
         ephemeralKeySecret: String? = nil
@@ -340,19 +383,29 @@ extension STPAPIClient {
         return promise
     }
 
-    /// Make a POST request using the passed StripeEncodable object.
-    @_spi(STP) public func post<I: StripeEncodable, O: StripeDecodable>(
+    /// Make a POST request using the passed Encodable object.
+    @_spi(STP) public func post<I: Encodable, O: Decodable>(
         resource: String,
         object: I,
         ephemeralKeySecret: String? = nil,
         completion: @escaping (Result<O, Error>) -> Void
     ) {
-        let urlComponents = URLComponents(url: apiURL.appendingPathComponent(resource), resolvingAgainstBaseURL: true)!
+        let url = apiURL.appendingPathComponent(resource)
+        post(url: url, object: object, ephemeralKeySecret: ephemeralKeySecret, completion: completion)
+    }
+    
+    /// Make a POST request using the passed Encodable object.
+    @_spi(STP) public func post<I: Encodable, O: Decodable>(
+        url: URL,
+        object: I,
+        ephemeralKeySecret: String? = nil,
+        completion: @escaping (Result<O, Error>) -> Void
+    ) {
         do {
             let jsonDictionary = try object.encodeJSONDictionary()
             let formData = URLEncoder.queryString(from: jsonDictionary).data(using: .utf8)
             var request = configuredRequest(
-                for: urlComponents.url!,
+                for: url,
                 using: ephemeralKeySecret,
                 additionalHeaders: [
                     "Content-Length" : String(format: "%lu", UInt(formData?.count ?? 0)),
@@ -376,7 +429,7 @@ extension STPAPIClient {
         }
     }
     
-    func sendRequest<T: StripeDecodable>(
+    func sendRequest<T: Decodable>(
         request: URLRequest,
         completion: @escaping (Result<T, Error>) -> Void
     ) {
@@ -387,7 +440,7 @@ extension STPAPIClient {
         })
     }
 
-    @_spi(STP) public static func decodeResponse<T: StripeDecodable>(
+    @_spi(STP) public static func decodeResponse<T: Decodable>(
         data: Data?,
         error: Error?
     ) -> Result<T, Error> {
@@ -405,7 +458,7 @@ extension STPAPIClient {
                 return .failure(decodedStripeError)
             }
 
-            let decodedObject: T = try JSONDecoder.decode(jsonData: data)
+            let decodedObject: T = try StripeJSONDecoder.decode(jsonData: data)
             return .success(decodedObject)
         } catch {
             // Try decoding the error from the service if one is available
@@ -422,7 +475,7 @@ extension STPAPIClient {
     private static func decodeStripeErrorResponse(data: Data) -> StripeError? {
         var decodedError: StripeError?
 
-        if let decodedErrorResponse: StripeAPIErrorResponse = try? JSONDecoder.decode(jsonData: data),
+        if let decodedErrorResponse: StripeAPIErrorResponse = try? StripeJSONDecoder.decode(jsonData: data),
            let apiError = decodedErrorResponse.error {
             decodedError = StripeError.apiError(apiError)
         }

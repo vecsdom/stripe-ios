@@ -54,7 +54,21 @@ class ChoosePaymentOptionViewController: UIViewController {
         }
     }
     var selectedPaymentMethodType: STPPaymentMethodType {
-        return addPaymentMethodViewController.selectedPaymentMethodType
+        switch mode {
+        case .selectingSaved:
+            guard let selectedPaymentOption = selectedPaymentOption else {
+                return .unknown
+            }
+            if case let .saved(paymentMethod) = selectedPaymentOption {
+                return paymentMethod.type
+            } else if case .applePay = selectedPaymentOption {
+                return .card
+            } else {
+                return .unknown
+            }
+        case .addingNew:
+            return addPaymentMethodViewController.selectedPaymentMethodType
+        }
     }
     weak var delegate: ChoosePaymentOptionViewControllerDelegate?
     lazy var navigationBar: SheetNavigationBar = {
@@ -122,7 +136,6 @@ class ChoosePaymentOptionViewController: UIViewController {
             style: .stripe,
             callToAction: .add(paymentMethodType: selectedPaymentMethodType),
             appearance: configuration.appearance,
-            backgroundColor: configuration.primaryButtonColor,
             didTap: { [weak self] in
                 self?.didTapAddButton()
             }
@@ -143,6 +156,9 @@ class ChoosePaymentOptionViewController: UIViewController {
         let header = PaymentSheetViewController.WalletHeaderView(options: walletOptions, appearance: configuration.appearance, delegate: self)
         header.linkAccount = linkAccount
         return header
+    }()
+    private lazy var bottomNoticeTextField: UITextView = {
+        return ElementsUI.makeNoticeTextField()
     }()
 
     // MARK: - Init
@@ -211,7 +227,12 @@ class ChoosePaymentOptionViewController: UIViewController {
 
         // One stack view contains all our subviews
         let stackView = UIStackView(arrangedSubviews: [
-            headerLabel, walletHeader, paymentContainerView, errorLabel, confirmButton,
+            headerLabel,
+            walletHeader,
+            paymentContainerView,
+            errorLabel,
+            confirmButton,
+            bottomNoticeTextField,
         ])
         stackView.bringSubviewToFront(headerLabel)
         stackView.directionalLayoutMargins = PaymentSheetUI.defaultMargins
@@ -343,13 +364,33 @@ class ChoosePaymentOptionViewController: UIViewController {
         }
 
         // Buy button
+        updateButton()
+
+        // Notice
+        updateBottomNotice()
+    }
+
+    func updateButton() {
         switch mode {
         case .selectingSaved:
-            UIView.animate(withDuration: PaymentSheetUI.defaultAnimationDuration) {
-                // We're selecting a saved PM, there's no 'Add' button
-                self.confirmButton.alpha = 0
-                self.confirmButton.isHidden = true
+            if selectedPaymentMethodType.requiresMandateDisplayForSavedSelection {
+                if confirmButton.isHidden {
+                    confirmButton.alpha = 0
+                    UIView.animate(withDuration: PaymentSheetUI.defaultAnimationDuration) {
+                        self.confirmButton.alpha = 1
+                        self.confirmButton.isHidden = false
+                    }
+                }
+                confirmButton.update(state: savedPaymentOptionsViewController.isRemovingPaymentMethods ? .disabled : .enabled,
+                                     callToAction: .customWithLock(title: String.Localized.continue), animated: true)
+            } else {
+                UIView.animate(withDuration: PaymentSheetUI.defaultAnimationDuration) {
+                    // We're selecting a saved PM without a mandate, there's no 'Add' button
+                    self.confirmButton.alpha = 0
+                    self.confirmButton.isHidden = true
+                }
             }
+
         case .addingNew:
             // Configure add button
             if confirmButton.isHidden {
@@ -359,7 +400,7 @@ class ChoosePaymentOptionViewController: UIViewController {
                     self.confirmButton.isHidden = false
                 }
             }
-            let confirmButtonState: ConfirmButton.Status = {
+            var confirmButtonState: ConfirmButton.Status = {
                 if isSavingInProgress || isVerificationInProgress {
                     // We're in the middle of adding the PM
                     return .processing
@@ -370,17 +411,50 @@ class ChoosePaymentOptionViewController: UIViewController {
                     return .enabled
                 }
             }()
+
+            var callToAction: ConfirmButton.CallToActionType = .add(paymentMethodType: selectedPaymentMethodType)
+            if let overrideCallToAction = addPaymentMethodViewController.overrideCallToAction {
+                callToAction = overrideCallToAction
+                confirmButtonState = addPaymentMethodViewController.overrideCallToActionShouldEnable ? .enabled : .disabled
+            }
+
             confirmButton.update(
                 state: confirmButtonState,
-                callToAction: .add(paymentMethodType: selectedPaymentMethodType),
+                callToAction: callToAction,
                 animated: true
             )
         }
     }
 
+    func updateBottomNotice() {
+        switch mode {
+        case .selectingSaved:
+            if selectedPaymentMethodType.requiresMandateDisplayForSavedSelection {
+                self.bottomNoticeTextField.attributedText = savedPaymentOptionsViewController.bottomNoticeAttributedString
+            } else {
+                self.bottomNoticeTextField.attributedText = nil
+            }
+        case .addingNew:
+            self.bottomNoticeTextField.attributedText = addPaymentMethodViewController.bottomNoticeAttributedString
+        }
+        UIView.animate(withDuration: PaymentSheetUI.defaultAnimationDuration) {
+            self.bottomNoticeTextField.setHiddenIfNecessary(self.bottomNoticeTextField.attributedText?.length == 0)
+        }
+    }
+
     @objc
     private func didTapAddButton() {
-        self.delegate?.choosePaymentOptionViewControllerShouldClose(self)
+        switch mode {
+        case .selectingSaved:
+            self.delegate?.choosePaymentOptionViewControllerShouldClose(self)
+        case .addingNew:
+            if let buyButtonOverrideBehavior = addPaymentMethodViewController.overrideBuyButtonBehavior {
+                addPaymentMethodViewController.didTapCallToActionButton(behavior: buyButtonOverrideBehavior, from: self)
+            } else {
+                self.delegate?.choosePaymentOptionViewControllerShouldClose(self)
+            }
+        }
+
     }
 
     func didDismiss() {
@@ -389,6 +463,7 @@ class ChoosePaymentOptionViewController: UIViewController {
         if savedPaymentOptionsViewController.isRemovingPaymentMethods {
             savedPaymentOptionsViewController.isRemovingPaymentMethods = false
             configureEditSavedPaymentMethodsButton()
+            updateUI()
         }
     }
 }
@@ -431,7 +506,7 @@ extension ChoosePaymentOptionViewController: SavedPaymentOptionsViewControllerDe
         case .applePay, .saved:
             delegate?.choosePaymentOptionViewControllerDidUpdateSelection(self)
             updateUI()
-            if isDismissable {
+            if isDismissable, !selectedPaymentMethodType.requiresMandateDisplayForSavedSelection {
                 delegate?.choosePaymentOptionViewControllerShouldClose(self)
             }
         }
@@ -461,6 +536,8 @@ extension ChoosePaymentOptionViewController: SavedPaymentOptionsViewControllerDe
             // just update the nav bar which is all we need to do anyway
             configureNavBar()
         }
+        updateButton()
+        updateBottomNotice()
     }
 
     // MARK: Helpers
@@ -481,6 +558,7 @@ extension ChoosePaymentOptionViewController: SavedPaymentOptionsViewControllerDe
     func didSelectEditSavedPaymentMethodsButton() {
         savedPaymentOptionsViewController.isRemovingPaymentMethods.toggle()
         configureEditSavedPaymentMethodsButton()
+        updateUI()
     }
 }
 
@@ -563,4 +641,11 @@ extension ChoosePaymentOptionViewController: WalletHeaderViewDelegate {
     
     }
 
+}
+
+// MARK: - STPPaymentMethodType Helpers
+extension STPPaymentMethodType {
+    var requiresMandateDisplayForSavedSelection: Bool {
+        return self == .USBankAccount
+    }
 }

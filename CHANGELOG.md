@@ -1,3 +1,16 @@
+## 22.2.0 2022-04-25
+
+### Connections
+* [Changed] `StripeConnections` SDK has been renamed to `StripeFinancialConnections`. See `MIGRATING.md` for more info.
+
+### PaymentSheet
+* [Fixed] Fixed an issue where `source_cancel` API requests were being made for non-3DS payment method types.
+* [Fixed] Fixed an issue where certain error messages were not being localized.
+
+### Identity
+* [Fixed] Minor UI fixes when using `IdentityVerificationSheet` with native components
+* [Changed] Improvements to native component `IdentityVerificationSheet` document detection
+
 ## 22.1.1 2022-04-11
 
 ### Identity

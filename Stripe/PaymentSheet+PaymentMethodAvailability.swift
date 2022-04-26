@@ -44,7 +44,7 @@ extension PaymentSheet {
             case .alipay, .EPS, .FPX, .giropay, .grabPay, .netBanking, .payPal, .przelewy24, .klarna, .linkInstantDebit:
                 return [.returnURL]
             case .USBankAccount:
-                return [.returnURL, .userSupportsDelayedPaymentMethods]
+                return [.userSupportsDelayedPaymentMethods, .financialConnectionsSDK, .validUSBankVerificationMethod]
             case .OXXO, .boleto:
                 return [.userSupportsDelayedPaymentMethods]
             case .AUBECSDebit:
@@ -93,7 +93,7 @@ extension PaymentSheet {
             case .alipay:
                 return [.returnURL]
             case .USBankAccount:
-                return [.returnURL, .userSupportsDelayedPaymentMethods]
+                return [.userSupportsDelayedPaymentMethods]
             case .iDEAL, .bancontact, .sofort:
                 // SEPA-family PMs are disallowed until we can reuse them for PI+sfu and SI.
                 // n.b. While iDEAL and bancontact are themselves not delayed, they turn into SEPA upon save, which IS delayed.
@@ -140,7 +140,14 @@ extension PaymentSheet {
             return accumulator + element.fulfilledRequirements
         }
         
-        return Set(requirements).isSubset(of: fulfilledRequirements)
+        let supports = Set(requirements).isSubset(of: fulfilledRequirements)
+        if paymentMethod == .USBankAccount {
+            if !fulfilledRequirements.contains(.financialConnectionsSDK) {
+                print("[Stripe SDK] Warning: us_bank_account requires the StripeConnections SDK. See https://stripe.com/docs/payments/ach-debit/accept-a-payment?platform=ios")
+            }
+        }
+
+        return supports
     }
 }
 
@@ -159,6 +166,9 @@ extension PaymentSheet.Configuration: PaymentMethodRequirementProvider {
         var reqs = [PaymentMethodTypeRequirement]()
         if returnURL != nil { reqs.append(.returnURL) }
         if allowsDelayedPaymentMethods { reqs.append(.userSupportsDelayedPaymentMethods) }
+        if FinancialConnectionsSDKAvailability.isFinancialConnectionsSDKAvailable {
+            reqs.append(.financialConnectionsSDK)
+        }
         return reqs
     }
 }
@@ -182,9 +192,34 @@ extension Intent: PaymentMethodRequirementProvider {
             if paymentIntent.setupFutureUsage == .none {
                 reqs.append(.notSettingUp)
             }
+
+            // valid us bank verification method
+            if let usBankOptions = paymentIntent.paymentMethodOptions?.usBankAccount,
+               usBankOptions.verificationMethod.isValidForPaymentSheet {
+                reqs.append(.validUSBankVerificationMethod)
+            }
+
             return reqs
-        case .setupIntent:
-            return []
+        case let .setupIntent(setupIntent):
+            var reqs = [PaymentMethodTypeRequirement]()
+
+            // valid us bank verification method
+            if let usBankOptions = setupIntent.paymentMethodOptions?.usBankAccount,
+               usBankOptions.verificationMethod.isValidForPaymentSheet {
+                reqs.append(.validUSBankVerificationMethod)
+            }
+            return reqs
+        }
+    }
+}
+
+extension STPPaymentMethodOptions.USBankAccount.VerificationMethod {
+    var isValidForPaymentSheet: Bool {
+        switch self {
+        case .skip, .microdeposits, .unknown:
+            return false
+        case .automatic, .instant, .instantOrSkip:
+            return true
         }
     }
 }
@@ -208,5 +243,12 @@ extension PaymentSheet {
         
         /// Requires that the user declare support for asynchronous payment methods
         case userSupportsDelayedPaymentMethods
+
+        /// Requires that the FinancialConnections SDK has been linked
+        case financialConnectionsSDK
+
+        /// Requires a valid us bank verification method
+        case validUSBankVerificationMethod
+
     }
 }

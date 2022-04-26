@@ -43,6 +43,34 @@ class ConsumerSessionTests: XCTestCase {
         wait(for: [expectation], timeout: STPTestingNetworkRequestTimeout)
     }
 
+    func testLookupSession_shouldDeleteInvalidSessionCookies() {
+        let expectation = self.expectation(description: "Lookup ConsumerSession")
+
+        cookieStore.write(key: cookieStore.sessionCookieKey, value: "bad_session_cookie", allowSync: false)
+
+        ConsumerSession.lookupSession(for: nil, with: apiClient, cookieStore: cookieStore) { lookupResponse, error in
+            XCTAssertNil(error, "Unexpected error received")
+
+            if let lookupResponse = lookupResponse {
+                switch lookupResponse.responseType {
+                case .notFound(_):
+                    // Expected response type.
+                    break
+
+                case .noAvailableLookupParams, .found(_):
+                    XCTFail("Unexpected response type: \(lookupResponse.responseType)")
+                }
+            } else {
+                XCTFail("Received nil ConsumerSession.LookupResponse")
+            }
+
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: STPTestingNetworkRequestTimeout)
+        XCTAssertNil(cookieStore.read(key: cookieStore.sessionCookieKey), "Invalid cookie not deleted")
+    }
+
     func testLookupSession_cookieOnly() {
         _ = createVerifiedConsumerSession()
         let expectation = self.expectation(description: "loookup consumersession")
@@ -199,40 +227,20 @@ class ConsumerSessionTests: XCTestCase {
 
         wait(for: [listExpectation], timeout: STPTestingNetworkRequestTimeout)
     }
-    
-    func _testLinkAccountSession(_ shouldAttach: Bool) {
-        
-        let consumerSession = createVerifiedConsumerSession()
-        let linkAccountExpectation = self.expectation(description: "link account session")
-        var linkAccountSessionClientSecret: String? = nil
-        consumerSession.createLinkAccountSession(with: apiClient,
-                                                 successURL: "www.example.com/success",
-                                                 cancelURL: "www.example.com/cancel") { (linkAccountSession, error) in
-            XCTAssertNil(error)
-            linkAccountSessionClientSecret = linkAccountSession?.clientSecret
-            XCTAssertNotNil(linkAccountSessionClientSecret)
-            linkAccountExpectation.fulfill()
-        }
-        wait(for: [linkAccountExpectation], timeout: STPTestingNetworkRequestTimeout)
-        if shouldAttach,
-           let clientSecret = linkAccountSessionClientSecret {
-            let attachExpectation = self.expectation(description: "link account session attach")
-            
-            consumerSession.attachAsAccountHolder(to: clientSecret, with: apiClient) { attachResponse, error in
-                XCTAssertNil(error)
-                XCTAssertNotNil(attachResponse)
-                attachExpectation.fulfill()
-            }
-            wait(for: [attachExpectation], timeout: STPTestingNetworkRequestTimeout)
-        }
-    }
-            
+
     func testCreateLinkAccountSession() {
-        _testLinkAccountSession(false)
-    }
-    
-    func testCreateAndAttachLinkAccountSession() {
-        _testLinkAccountSession(true)
+        let createLinkAccountSessionExpectation = self.expectation(description: "Create LinkAccountSession")
+
+        let consumerSession = createVerifiedConsumerSession()
+        consumerSession.createLinkAccountSession(
+            with: apiClient
+        ) { (linkAccountSession, error) in
+            XCTAssertNil(error)
+            XCTAssertNotNil(linkAccountSession?.clientSecret)
+            createLinkAccountSessionExpectation.fulfill()
+        }
+
+        wait(for: [createLinkAccountSessionExpectation], timeout: STPTestingNetworkRequestTimeout)
     }
     
     func testUpdatePaymentDetails() {

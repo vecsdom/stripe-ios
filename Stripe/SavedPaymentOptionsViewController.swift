@@ -75,6 +75,14 @@ class SavedPaymentOptionsViewController: UIViewController {
             }
         }
     }
+    var bottomNoticeAttributedString: NSAttributedString? {
+        if case .saved(let paymentMethod) = selectedPaymentOption {
+            if let _ = paymentMethod.usBankAccount {
+                return USBankAccountPaymentMethodElement.attributedMandateTextSavedPaymentMethod()
+            }
+        }
+        return nil
+    }
 
     // MARK: - Internal Properties
     let configuration: Configuration
@@ -312,9 +320,7 @@ extension SavedPaymentOptionsViewController: PaymentOptionCellDelegate {
         }
         let viewModel = viewModels[indexPath.row]
         let alert = UIAlertAction(
-            title: STPLocalizedString(
-                "Remove", "Button title for confirmation alert to remove a saved payment method"
-            ), style: .destructive
+            title: String.Localized.remove, style: .destructive
         ) { (_) in
             self.viewModels.remove(at: indexPath.row)
             // the deletion needs to be in a performBatchUpdates so we make sure it is completed
@@ -377,15 +383,16 @@ extension STPPaymentMethod {
             )
         case .SEPADebit:
             let last4 = sepaDebit?.last4 ?? ""
-            let formattedMessage = STPLocalizedString(
-                "Remove bank account ending in %@",
-                "Content for alert popup prompting to confirm removing a saved bank account. e.g. 'Remove bank account ending in 4242'"
-            )
+            let formattedMessage = String.Localized.removeBankAccountEndingIn
             return (
-                title: STPLocalizedString(
-                    "Remove bank account",
-                    "Title for confirmation alert to remove a saved bank account payment method"
-                ),
+                title: String.Localized.removeBankAccount,
+                message: String(format: formattedMessage, last4)
+            )
+        case .USBankAccount:
+            let last4 = usBankAccount?.last4 ?? ""
+            let formattedMessage = String.Localized.removeBankAccountEndingIn
+            return (
+                title: String.Localized.removeBankAccount,
                 message: String(format: formattedMessage, last4)
             )
         default:

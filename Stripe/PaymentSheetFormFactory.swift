@@ -50,7 +50,7 @@ class PaymentSheetFormFactory {
     ) {
         // Set the current elements theme
         ElementsUITheme.current = configuration.appearance.asElementsTheme
-     
+        
         switch intent {
         case let .paymentIntent(paymentIntent):
             let merchantRequiresSave = paymentIntent.setupFutureUsage != .none
@@ -85,7 +85,7 @@ class PaymentSheetFormFactory {
         } else if paymentMethod == .linkInstantDebit {
             return ConnectionsElement()
         } else if paymentMethod == .USBankAccount {
-            return makeUSBankAccount()
+            return makeUSBankAccount(merchantName: configuration.merchantDisplayName)
         }
 
         // 2. Element-based forms defined in JSON
@@ -221,10 +221,20 @@ extension PaymentSheetFormFactory {
 
     // MARK: - PaymentMethod form definitions
 
-    func makeUSBankAccount() -> PaymentMethodElement {
-        return USBankAccountPaymentMethodElement(nameElement: makeFullName(),
+    func makeUSBankAccount(merchantName: String) -> PaymentMethodElement {
+        let isSaving = BoolReference()
+        let saveCheckbox = makeSaveCheckbox(
+            label: String(format: STPLocalizedString("Save this account for future %@ payments", "Prompt next to checkbox to save bank account."), merchantName)) { value in
+                isSaving.value = value
+            }
+        let shouldDisplaySaveCheckbox: Bool = saveMode == .userSelectable && !canSaveToLink
+        isSaving.value = shouldDisplaySaveCheckbox ? configuration.savePaymentMethodOptInBehavior.isSelectedByDefault : saveMode == .merchantRequired
+        return USBankAccountPaymentMethodElement(titleElement: makeUSBankAccountCopyLabel(),
+                                                 nameElement: makeFullName(),
                                                  emailElement: makeEmail(),
-                                                 spacerElement: makeSpacer())
+                                                 checkboxElement: shouldDisplaySaveCheckbox ? saveCheckbox : nil,
+                                                 savingAccount: isSaving,
+                                                 merchantName: merchantName)
     }
 
     func makeBancontact() -> [PaymentMethodElement] {
@@ -351,26 +361,25 @@ extension PaymentSheetFormFactory {
         return [label]
     }
     
-    func makeSpacer() -> StaticElement {
-        let spacerView = UIView()
-        spacerView.translatesAutoresizingMaskIntoConstraints = false
-        spacerView.heightAnchor.constraint(equalToConstant: STPFormView.interSectionSpacing).isActive =
-            true
-        
-        return StaticElement(view: spacerView)
-    }
-    
     private func makeKlarnaCopyLabel() -> StaticElement {
-        let klarnaLabel = UILabel()
-        if KlarnaHelper.canBuyNow() {
-            klarnaLabel.text = STPLocalizedString("Buy now or pay later with Klarna.", "Klarna buy now or pay later copy")
-        } else {
-            klarnaLabel.text = STPLocalizedString("Pay later with Klarna.", "Klarna pay later copy")
-        }
-        klarnaLabel.font = ElementsUITheme.current.fonts.subheadline
-        klarnaLabel.textColor = ElementsUITheme.current.colors.secondaryText
-        klarnaLabel.numberOfLines = 0
-        return StaticElement(view: klarnaLabel)
+        let text = KlarnaHelper.canBuyNow()
+        ? STPLocalizedString("Buy now or pay later with Klarna.", "Klarna buy now or pay later copy")
+        : STPLocalizedString("Pay later with Klarna.", "Klarna pay later copy")
+        return makeSectionTitleLabelWith(text: text)
+    }
+
+    private func makeUSBankAccountCopyLabel() -> StaticElement {
+        return makeSectionTitleLabelWith(text: STPLocalizedString("Pay with your bank account in just a few steps.",
+                                                                  "US Bank Account copy title for Mobile payment element form"))
+    }
+
+    private func makeSectionTitleLabelWith(text: String) -> StaticElement {
+        let label = UILabel()
+        label.text = text
+        label.font = ElementsUITheme.current.fonts.subheadline
+        label.textColor = ElementsUITheme.current.colors.secondaryText
+        label.numberOfLines = 0
+        return StaticElement(view: label)
     }
 }
 
@@ -433,7 +442,7 @@ extension PaymentSheet.Appearance {
 
         theme.borderWidth = borderWidth
         theme.cornerRadius = cornerRadius
-        theme.shadow = shadow?.asElementThemeShadow
+        theme.shadow = shadow.asElementThemeShadow
 
         var fonts = ElementsUITheme.Font()
         fonts.subheadline = scaledFont(for: font.base.regular, style: .subheadline, maximumPointSize: 20)
@@ -448,10 +457,10 @@ extension PaymentSheet.Appearance {
     }
 }
 
-private extension PaymentSheet.Appearance.Shadow {
+extension PaymentSheet.Appearance.Shadow {
 
     /// Creates an `ElementsUITheme.Shadow` based on this PaymentSheet appearance shadow
-    var asElementThemeShadow: ElementsUITheme.Shadow {
+    var asElementThemeShadow: ElementsUITheme.Shadow? {
         return ElementsUITheme.Shadow(color: color, opacity: opacity, offset: offset)
     }
 

@@ -18,7 +18,7 @@ extension PaymentOption {
         case .saved(let paymentMethod):
             return paymentMethod.makeIcon()
         case .new(let confirmParams):
-            return confirmParams.paymentMethodParams.makeIcon()
+            return confirmParams.makeIcon()
         case .link(_, let confirmOption):
             switch confirmOption {
             case .forNewAccount(_, let paymentMethodParams):
@@ -58,6 +58,8 @@ extension STPPaymentMethod {
             return STPImageLibrary.cardBrandImage(for: card.brand)
         case .iDEAL:
             return Image.pm_type_ideal.makeImage()
+        case .USBankAccount:
+            return STPImageLibrary.bankIcon(for: STPImageLibrary.bankIconCode(for: usBankAccount?.bankName))
         default:
             // If there's no image specific to this PaymentMethod (eg card network logo, bank logo), default to the PaymentMethod type's icon
             return type.makeImage()
@@ -67,10 +69,14 @@ extension STPPaymentMethod {
     func makeCarouselImage(for view: UIView) -> UIImage {
         if type == .card, let cardBrand = card?.brand {
             return cardBrand.makeCarouselImage()
+        } else if type == .USBankAccount {
+            return STPImageLibrary.bankIcon(for: STPImageLibrary.bankIconCode(for: usBankAccount?.bankName))
         }
         return makeIcon()
     }
 }
+
+
 
 extension STPPaymentMethodParams {
     func makeIcon() -> UIImage {
@@ -158,3 +164,4 @@ extension STPPaymentMethodType {
         return image.makeImage(darkMode: self == .payPal ? forDarkBackground : false)
     }
 }
+

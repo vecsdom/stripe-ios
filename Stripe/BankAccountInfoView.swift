@@ -37,13 +37,16 @@ class BankAccountInfoView: UIView {
     }()
 
     lazy var bankIconImageView: UIImageView = {
-        // TODO: MOBILESDK-770: Do lookup based on bank name
-        let bankIcon = STPImageLibrary.bankIcon(for: nil)
-        return UIImageView(image: bankIcon)
+        let imageView = UIImageView()
+        imageView.layer.cornerRadius = 2
+        imageView.clipsToBounds = true
+        imageView.tintColor = CompatibleColor.systemGray2
+        return imageView
     }()
 
     lazy var xIcon: UIImageView = {
-        let xIcon = UIImageView(image: Image.icon_x_standalone.makeImage())
+        let xIcon = UIImageView(image: Image.icon_x_standalone.makeImage(template: true))
+        xIcon.tintColor = CompatibleColor.systemGray2
         xIcon.isUserInteractionEnabled = true
         return xIcon
     }()
@@ -55,6 +58,13 @@ class BankAccountInfoView: UIView {
     }()
 
     var delegate: BankAccountInfoViewDelegate?
+
+    override var isUserInteractionEnabled: Bool {
+        didSet {
+            xIconTappableArea.isUserInteractionEnabled = isUserInteractionEnabled
+            updateUI()
+        }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -94,6 +104,7 @@ class BankAccountInfoView: UIView {
 
             xIconTappableArea.leadingAnchor.constraint(greaterThanOrEqualTo: bankAccountNumberLabel.trailingAnchor, constant: Constants.spacing),
             xIconTappableArea.trailingAnchor.constraint(equalTo: trailingAnchor),
+            xIconTappableArea.widthAnchor.constraint(equalToConstant: 44.0),
             xIconTappableArea.topAnchor.constraint(equalTo: topAnchor),
             xIconTappableArea.bottomAnchor.constraint(equalTo: bottomAnchor),
 
@@ -116,9 +127,28 @@ class BankAccountInfoView: UIView {
 
     func setBankName(text: String) {
         self.bankNameLabel.text = text
+        bankIconImageView.image = STPImageLibrary.bankIcon(for: STPImageLibrary.bankIconCode(for: text))
     }
 
     func setLastFourOfBank(text: String) {
         self.bankAccountNumberLabel.text = text
+    }
+
+    func updateUI() {
+        bankNameLabel.textColor = isUserInteractionEnabled ? ElementsUITheme.current.colors.textFieldText : CompatibleColor.tertiaryLabel
+        bankAccountNumberLabel.textColor = isUserInteractionEnabled ? ElementsUITheme.current.colors.textFieldText : CompatibleColor.tertiaryLabel
+        bankIconImageView.alpha = isUserInteractionEnabled ? 1.0 : 0.5
+        xIcon.alpha = isUserInteractionEnabled ? 1.0 : 0.5
+    }
+}
+
+extension BankAccountInfoView: EventHandler {
+    func handleEvent(_ event: STPEvent) {
+        switch event {
+        case .shouldEnableUserInteraction:
+            self.isUserInteractionEnabled = true
+        case .shouldDisableUserInteraction:
+            self.isUserInteractionEnabled = false
+        }
     }
 }
