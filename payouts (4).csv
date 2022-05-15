@@ -1,0 +1,6 @@
+id,Amount,Created (UTC),Currency,Arrival Date (UTC),Source Type,Status,Type,Method,Balance Transaction,Destination Name,Destination Country,Destination Last 4
+po_1Ky4MAKcl2snLMpMOzP3kPXN,499930.00,2022-05-11 01:28,huf,2022-05-11 00:00,card,paid,bank_account,standard,txn_1Ky4MBKcl2snLMpMbQ0hmx2l,OTP BANK PLC.,HU,0000
+po_1Kxi60Kcl2snLMpMut799Nna,1369560.00,2022-05-10 01:42,huf,2022-05-10 00:00,card,paid,bank_account,standard,txn_1Kxi61Kcl2snLMpMwPPNCrv3,OTP BANK PLC.,HU,0000
+po_1KwFcuKcl2snLMpMWy71t0oL,82430.00,2022-05-06 01:06,huf,2022-05-06 00:00,card,paid,bank_account,standard,txn_1KwFcvKcl2snLMpMRh5lEhGw,OTP BANK PLC.,HU,0000
+po_1KvWdBKcl2snLMpMgGoPFWDz,485415.00,2022-05-04 01:03,huf,2022-05-04 00:00,card,paid,bank_account,standard,txn_1KvWdCKcl2snLMpMIbbcdZQk,OTP BANK PLC.,HU,0000
+po_1KvACIKcl2snLMpMineMCGbh,679530.00,2022-05-03 01:06,huf,2022-05-03 00:00,card,paid,bank_account,standard,txn_1KvACJKcl2snLMpMcEUTpU9i,OTP BANK PLC.,HU,0000
